@@ -5,7 +5,7 @@
 - Svelte 5, SvelteKit 3, TypeScript, following https://svelte.dev/llms.txt.
 - Cloudflare Access with Google login identifies participants without app signup, app passwords, or SMS/email codes.
 - The verified email maps to one participant in a private configuration file. No production name picker or shared family password.
-- A private, saved draw file stores giver-to-recipient IDs. A database is unnecessary while the app remains read-only.
+- A private, saved draw file stores giver-to-recipient IDs. A database is unnecessary with initialization as the only automatic write.
 - Explicitly enabled, loopback-only development identities support local work without Cloudflare with an independent data-source setting: committed fictional people or the ignored private family file with a separate development draw.
 
 ## Required behavior
@@ -16,8 +16,8 @@
 4. No request can choose a different giver. The reveal endpoint derives the giver exclusively from the verified server identity.
 5. Allow hiding and revealing again, logout through Access, and deliberate account switching on shared devices. Clear visible recipients on navigation/page hide; do not serialize assignments into initial HTML/page data.
 6. Read configured event ID/year, celebration date, budget, and participants. Keep all real emails/assignments outside Git and public assets.
-7. Generate one draw with secure randomness, no self assignments, and exactly one giver/recipient occurrence per participant. An organizer command creates a complete file without overwriting a draw. Never draw in page loads or requests.
-8. Reject malformed config, duplicate IDs/emails, mismatched events/participant sets, and invalid draws. Missing data produces an unavailable state, never an automatic redraw.
+7. Generate one draw with secure randomness, no self assignments, and exactly one giver/recipient occurrence per participant. Server initialization creates a complete draw only when absent, before responding to requests; builds skip generation. Reuse existing valid files without changing them, handle concurrent starts atomically, and never print pairings. Keep the optional organizer command. Never draw in page loads or reveal handlers.
+8. Reject malformed config, duplicate IDs/emails, mismatched events/participant sets, and invalid draws. Missing family configuration or invalid existing draws fail initialization without a redraw. Only a missing draw permits automatic generation at initialization; an absent file during reveal fails closed.
 9. Use a mobile-first, single-card layout centered on reveal/hide, with short copy, whimsical details, and no budget information. Support small screens, keyboard interaction, visible focus, labeled controls, accessible error/status announcements, and reduced motion.
 
 ## Authentication and privacy
@@ -35,7 +35,7 @@ Local-key JWT tests; participant/reveal authorization tests; file validation, st
 
 ## Storage and scope limits
 
-Target a Node host with persistent private files. Back up and retain config/draw together across deployments. Cloudflare Workers require a different storage backend. A database becomes useful with mutable wishlists/admin UI/audit records, not for the current read-only flow. Directional pairing exclusions are configured in the family file and enforced on generation and saved-draw validation. Mutual exclusions are kept in the ignored private config. Previous-year avoidance, reminders, and organizer UI remain future scope.
+Target a Node host with persistent private files. Back up and retain config/draw together across deployments. Cloudflare Workers require a different storage backend. A database becomes useful with mutable wishlists/admin UI/audit records, not for the current initialization-and-read flow. Directional pairing exclusions are configured in the family file and enforced on generation and saved-draw validation. Mutual exclusions are kept in the ignored private config. Previous-year avoidance, reminders, and organizer UI remain future scope.
 
 ## Remaining decisions
 

@@ -1,9 +1,15 @@
 import { paraglideMiddleware } from '#lib/paraglide/server.js';
-import { dev } from '$app/env';
+import { building, dev } from '$app/env';
 import * as env from '$app/env/private';
-import type { Handle } from '@sveltejs/kit/hooks';
+import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
 import { accessConfig, DEVELOPMENT_COOKIE, localIdentityEnabled, verifyAccessToken } from '#lib/server/cloudflare.js';
-import { currentFamily, familySource } from '#lib/server/current-family.js';
+import { currentFamily, familySource, initializeCurrentDraw } from '#lib/server/current-family.js';
+
+export const init: ServerInit = async () => {
+	// Build analysis must not read private data or create an event's draw.
+	if (building) return;
+	await initializeCurrentDraw(localIdentityEnabled(dev, env.DEV_AUTH_ENABLED));
+};
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const localMode = localIdentityEnabled(dev, env.DEV_AUTH_ENABLED);

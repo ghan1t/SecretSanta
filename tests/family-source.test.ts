@@ -8,7 +8,7 @@ const { env, readFamily, readDraw } = vi.hoisted(() => ({
 }));
 vi.mock('$app/env/private', () => env);
 vi.mock('../src/lib/server/storage.js', () => ({ readFamily, readDraw }));
-const { currentFamily, currentDraw, familySource } = await import('../src/lib/server/current-family.js');
+const { currentFamily, currentDraw, familySource, initializeCurrentDraw } = await import('../src/lib/server/current-family.js');
 
 beforeEach(() => {
 	for (const key of Object.keys(env)) env[key] = undefined;
@@ -24,6 +24,20 @@ beforeEach(() => {
 	});
 });
 describe('development family data source', () => {
+	it('skips initialization for fictional data and initializes only the selected private draw', async () => {
+		await initializeCurrentDraw(true);
+		expect(readFamily).not.toHaveBeenCalled();
+		expect(readDraw).not.toHaveBeenCalled();
+		env.DEV_FAMILY_SOURCE = 'private';
+		await initializeCurrentDraw(true);
+		expect(readDraw).toHaveBeenCalledWith('config/draw.dev.private.json', family);
+		expect(readDraw).not.toHaveBeenCalledWith('config/draw.private.json', family);
+	});
+	it('initializes production private files even when fictional dev settings are enabled', async () => {
+		env.DEV_FAMILY_SOURCE = 'fictional';
+		await initializeCurrentDraw(false);
+		expect(readDraw).toHaveBeenCalledWith('config/draw.private.json', family);
+	});
 	it('defaults to fictional data without reading private files', async () => {
 		expect(familySource(true)).toBe('fictional');
 		expect(await currentFamily(true)).toEqual(family);

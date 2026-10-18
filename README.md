@@ -30,13 +30,9 @@ FAMILY_CONFIG_PATH=config/family.private.json
 DEV_DRAW_PATH=config/draw.dev.private.json
 ```
 
-The private family file is prepared in this workspace with placeholder Gmail addresses and your exclusion rules. It is ignored by Git. A separate development draw is prepared at `config/draw.dev.private.json`; on a fresh checkout, generate it once with:
+The private family file is prepared in this workspace with placeholder Gmail addresses and your exclusion rules. It is ignored by Git. Private development automatically creates `DEV_DRAW_PATH` during server initialization if it is missing, then reuses it. It never uses the production draw.
 
-```sh
-npm run draw -- config/family.private.json config/draw.dev.private.json
-```
-
-Restart the dev server after changing `.env`, then select a person in the dev toolbar. Source changes clear the active identity selection. Missing/invalid private files show an unavailable state, without falling back to fictional data or the production draw.
+Restart the dev server after changing `.env`, then select a person in the dev toolbar. Source changes clear the active identity selection. Missing family configuration or invalid saved draws fail initialization without falling back to fictional data or the production draw.
 
 The bypass requires SvelteKit development mode, `DEV_AUTH_ENABLED=true`, and a loopback hostname. `npm run preview` and production always require Cloudflare identity and use `FAMILY_CONFIG_PATH` / `DRAW_PATH`; development settings and selector cookies grant no access there. Disable the bypass when testing real Access through a tunnel.
 
@@ -54,15 +50,17 @@ This version targets a Node server with persistent private files. See [storage d
 
 1. Edit the prepared, ignored `config/family.private.json` and replace the placeholder Gmail addresses. For a fresh checkout, copy `config/family.example.json` first.
 2. Replace synthetic participants with real names and the exact email addresses returned by their Google accounts. Use one unique email per person.
-3. Set the event ID, year, date, and budget. Generate the draw once:
+3. Finalize the event and exclusion rules, set `FAMILY_CONFIG_PATH` and `DRAW_PATH`, then start the server. During runtime initialization (before serving requests), it generates the draw only if the file is absent. Builds never generate draws. No pairing is printed to the logs.
+
+Existing draws are validated and reused byte for byte. Corrupt, incompatible, or unreadable draws fail initialization and are never replaced. Concurrent starts publish one complete draw atomically. Refreshing or revealing only reads the saved file.
+
+Both private files live in `config/`, so a container needs one persistent **writable** directory mount (see [container mount settings](docs/STORAGE.md#container-mount)). The server's user must be able to create files there; draw files have owner-only permissions. Keep the directory outside `static/`, out of Git, and backed up across deployments. Restore backups before starting a replacement server: an absent file on a new start creates a new draw.
+
+The operator can deliberately inspect the files, but normal setup never displays the pairings. The optional manual command remains available and refuses to overwrite an existing draw:
 
 ```sh
 npm run draw -- config/family.private.json config/draw.private.json
 ```
-
-The command uses secure randomness, validates a one-to-one draw with no self assignments, and atomically creates a private file. It refuses to overwrite an existing draw. The web app never generates or changes the draw.
-
-Both private files live in `config/`, so a container needs only one read-only directory mount (see [container mount settings](docs/STORAGE.md#container-mount)). Keep them outside `static/`, out of Git, backed up, and persistent across deployments. The operator can read the files. Do not generate the real draw until the participant list is final.
 
 ## Cloudflare Google login
 
@@ -107,4 +105,4 @@ Pairing exclusions are directional entries in the private config's `exclusions` 
 ]
 ```
 
-Use participant IDs in rules; self assignments are always forbidden. Saved draws are checked against these rules as well. Changing rules can invalidate an existing draw; the app will refuse to reveal it. Fictional mode uses a fixed example draw; private development mode uses its separate saved development draw. Generate the production draw once when the participant list and rules are final.
+Use participant IDs in rules; self assignments are always forbidden. Saved draws are checked against these rules as well. Changing rules can invalidate an existing draw; the app will refuse to reveal it. Fictional mode uses a fixed example draw; private development mode uses its separate saved development draw. The first production start creates the production draw, so finalize the participant list and rules before starting it.
