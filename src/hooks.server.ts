@@ -1,3 +1,4 @@
+import { paraglideMiddleware } from '#lib/paraglide/server.js';
 import { dev } from '$app/env';
 import * as env from '$app/env/private';
 import type { Handle } from '@sveltejs/kit/hooks';
@@ -35,7 +36,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 			event.locals.authStatus = 'unavailable';
 		}
 	}
-	const response = await resolve(event);
+	const response = await paraglideMiddleware(event.request, ({ request, locale }) =>
+		resolve({ ...event, request }, {
+			transformPageChunk: ({ html }) => html.replace('%lang%', locale)
+		})
+	);
 	response.headers.set('Cache-Control', 'private, no-store');
 	response.headers.set('Referrer-Policy', 'same-origin');
 	response.headers.set('X-Content-Type-Options', 'nosniff');

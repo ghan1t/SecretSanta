@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { m } from '#lib/paraglide/messages.js';
+	import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
 	import { beforeNavigate } from '$app/navigation';
 	import { onDestroy } from 'svelte';
 	import type { PageProps } from './$types';
@@ -69,12 +71,12 @@
 			const response = await fetch('/api/recipient', { method: 'POST', signal: pending.signal });
 			const result = await response.json();
 			if (requestVersion !== version) return;
-			if (!response.ok) { message = result.error ?? 'Please try again.'; return; }
+			if (!response.ok) { message = result.error ?? m.error_retry(); return; }
 			if (typeof result.recipient?.name !== 'string') throw new Error('Invalid response');
 			recipient = result.recipient.name;
 			animateEnvelope(1);
 		} catch (error) {
-			if (requestVersion === version && !(error instanceof DOMException && error.name === 'AbortError')) message = 'We couldn’t open your assignment. Please try again.';
+			if (requestVersion === version && !(error instanceof DOMException && error.name === 'AbortError')) message = m.error_open();
 		} finally {
 			if (requestVersion === version) { loading = false; pending = null; }
 		}
@@ -82,8 +84,8 @@
 </script>
 
 <svelte:head>
-	<title>Family Secret Santa</title>
-	<meta name="description" content="A little mystery for our family gift exchange." />
+	<title>{m.page_title()}</title>
+	<meta name="description" content={m.page_description()} />
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 <svelte:window onpagehide={reset} onpageshow={reset} />
@@ -100,19 +102,24 @@
 
 <div class="page-shell">
 	<header class="app-header">
-		<a class="wordmark" href="/" aria-label="Family Secret Santa home"><span class="brand-star" aria-hidden="true">{@render treeIcon()}</span> secret santa<span class="brand-dot" aria-hidden="true">.</span></a>
-		{#if data.user}<form method="POST" action="/logout" data-sveltekit-reload onsubmit={reset}><button type="submit" class="logout">Sign out <span aria-hidden="true">↗</span></button></form>{:else}<span class="family-label">family edition</span>{/if}
+		<a class="wordmark" href="/" aria-label={m.home_label()}><span class="brand-star" aria-hidden="true">{@render treeIcon()}</span> {m.brand()}<span class="brand-dot" aria-hidden="true">.</span></a>
+		<div class="header-actions">
+			{#if data.user}<form method="POST" action="/logout" data-sveltekit-reload onsubmit={reset}><button type="submit" class="logout">{m.sign_out()} <span aria-hidden="true">↗</span></button></form>{:else}<span class="family-label">{m.family_edition()}</span>{/if}
+			<button type="button" class="language-toggle" aria-label={m.switch_language({ language: getLocale() === 'en' ? 'Latviešu' : 'English' })} title={getLocale() === 'en' ? 'Latviešu' : 'English'} onclick={() => { reset(); setLocale(getLocale() === 'en' ? 'lv' : 'en'); }}>
+				<span aria-hidden="true">{getLocale() === 'en' ? '🇱🇻' : '🇬🇧'}</span>
+			</button>
+		</div>
 	</header>
 
 	<main>
-		<section class="secret-card" class:is-revealed={recipient !== null} aria-label="Your Secret Santa">
-			<div class="card-topline"><span>{data.event?.year ?? 'JUST FOR YOU'}</span><span class="postage-mark" aria-hidden="true">{@render snowIcon()}{@render treeIcon()}{@render giftIcon()}</span><span>SECRET SANTA</span></div>
+		<section class="secret-card" class:is-revealed={recipient !== null} aria-label={m.card_label()}>
+			<div class="card-topline"><span>{data.event?.year ?? m.just_for_you()}</span><span class="postage-mark" aria-hidden="true">{@render snowIcon()}{@render treeIcon()}{@render giftIcon()}</span><span>{m.card_stamp()}</span></div>
 			<div class="card-content" aria-live="polite" aria-busy={loading}>
 				{#if data.state === 'ready' && data.user}
 					<div class="reveal-heading">
-						<p class="eyebrow">{recipient ? 'THE SECRET IS OUT' : 'A LITTLE SOMETHING FOR YOU'}</p>
-						<h1>{#if recipient}Your person is…{:else}Psst, {data.user.name}<span class="heading-star" aria-hidden="true">✧</span>{/if}</h1>
-						<p class="card-copy">{recipient ? 'Let the secret scheming begin.' : 'Your Christmas person is waiting.'}</p>
+						<p class="eyebrow">{recipient ? m.eyebrow_revealed() : m.eyebrow_waiting()}</p>
+						<h1>{#if recipient}{m.revealed_heading()}{:else}{m.greeting({ name: data.user.name })}<span class="heading-star" aria-hidden="true">✧</span>{/if}</h1>
+						<p class="card-copy">{recipient ? m.revealed_copy() : m.waiting_copy()}</p>
 					</div>
 					<div class="envelope-scene" class:is-open={recipient !== null}>
 						<span class="scene-spark spark-left" aria-hidden="true">{@render snowIcon()}</span>
@@ -146,55 +153,55 @@
 						<div class="letter-paper" style:transform={`translate(-50%, -50%) translate3d(0, ${28 - letterLift * 58}px, ${-60 + letterLift * 110}px) rotateX(${(1 - letterLift) * 55}deg) scale(${.5 + letterLift * .5})`} style:opacity={nameOpacity} aria-hidden={recipient === null || nameOpacity < .99}>
 							<div class="recipient" style:--name-size={`${nameSize}px`}>
 								<span class="paper-spark" aria-hidden="true">✧</span>
-								<span class="recipient-label">you’re gifting to</span>
+								<span class="recipient-label">{m.recipient_label()}</span>
 								<strong>{recipient ?? ''}</strong>
 								<svg class="name-underline" viewBox="0 0 150 12" aria-hidden="true"><path d="M4 6Q68 0 145 5M25 10Q82 4 127 9" /></svg>
-								<span class="paper-signoff">with a little Christmas magic ♡</span>
+								<span class="paper-signoff">{m.paper_signoff()}</span>
 							</div>
 						</div>
 						</div>
-						<span class="letter-caption" aria-hidden="true">{recipient ? 'a secret, unfolded' : 'a little North Pole post'}</span>
+						<span class="letter-caption" aria-hidden="true">{recipient ? m.caption_open() : m.caption_closed()}</span>
 					</div>
 					<button type="button" class="primary" onclick={() => recipient ? hide() : reveal()} disabled={loading}>
-						{loading ? 'A little drumroll…' : recipient ? 'Hide my person' : 'Reveal my person'} <span aria-hidden="true">{recipient ? '♡' : '✧'}</span>
+						{loading ? m.reveal_loading() : recipient ? m.hide_person() : m.reveal_person()} <span aria-hidden="true">{recipient ? '♡' : '✧'}</span>
 					</button>
-					<p class="tiny-note">{recipient ? 'Your lips are sealed. Right?' : 'For your eyes only.'}</p>
+					<p class="tiny-note">{recipient ? m.note_revealed() : m.note_waiting()}</p>
 				{:else}
 					<div class="welcome-doodle" aria-hidden="true">{data.state === 'unknown' ? '?' : data.state === 'unavailable' ? '☁' : '♡'}<span>✧</span></div>
 					{#if data.state === 'unknown'}
-						<p class="eyebrow">A CASE OF MISTAKEN IDENTITY</p><h1>Wrong party?</h1>
-						<p class="card-copy">Try your other Google account,<br />or give the organizer a nudge.</p>
-						<form method="POST" action="/logout" data-sveltekit-reload><button class="primary" type="submit">Try another account <span aria-hidden="true">↗</span></button></form>
+						<p class="eyebrow">{m.unknown_eyebrow()}</p><h1>{m.unknown_heading()}</h1>
+						<p class="card-copy">{m.unknown_copy()}</p>
+						<form method="POST" action="/logout" data-sveltekit-reload><button class="primary" type="submit">{m.try_account()} <span aria-hidden="true">↗</span></button></form>
 					{:else if data.state === 'unavailable'}
-						<p class="eyebrow">ONE SMALL PAUSE</p><h1>A tiny hiccup.</h1>
-						<p class="card-copy">We couldn’t open the door.<br />Try again or ask the organizer.</p>
-						<a class="primary button-link" href="/" data-sveltekit-reload>Try again <span aria-hidden="true">↻</span></a>
+						<p class="eyebrow">{m.unavailable_eyebrow()}</p><h1>{m.unavailable_heading()}</h1>
+						<p class="card-copy">{m.unavailable_copy()}</p>
+						<a class="primary button-link" href="/" data-sveltekit-reload>{m.retry()} <span aria-hidden="true">↻</span></a>
 					{:else}
-						<p class="eyebrow">YOU’RE ON THE NICE LIST</p><h1>Psst. Come in.</h1>
-						<p class="card-copy">One name. One little secret.</p>
-						{#if data.localMode}<p class="local-help">Pick a test person in the playground below.</p>{:else}<p class="local-help">Use your family’s private app link to sign in with Google.</p>{/if}
+						<p class="eyebrow">{m.welcome_eyebrow()}</p><h1>{m.welcome_heading()}</h1>
+						<p class="card-copy">{m.welcome_copy()}</p>
+						{#if data.localMode}<p class="local-help">{m.local_help()}</p>{:else}<p class="local-help">{m.login_help()}</p>{/if}
 					{/if}
 				{/if}
 				{#if message}<p class="error" role="alert">{message}</p>{/if}
 			</div>
-			<div class="card-footer"><span aria-hidden="true">{@render treeIcon()}</span> a little Christmas conspiracy <span aria-hidden="true">{@render treeIcon()}</span></div>
+			<div class="card-footer"><span aria-hidden="true">{@render treeIcon()}</span> {m.footer()} <span aria-hidden="true">{@render treeIcon()}</span></div>
 		</section>
-		<p class="under-card" aria-hidden="true">merry little secrets <span>♡</span></p>
+		<p class="under-card" aria-hidden="true">{m.under_card()} <span>♡</span></p>
 	</main>
 
 	{#if data.localMode}
 		<details class="development-toolbar">
-			<summary>Dev playground <span>· fictional people</span></summary>
+			<summary>{m.dev_summary()} <span>· {m.dev_fictional()}</span></summary>
 			<form method="POST" action="/dev/identity" data-sveltekit-reload>
-				<label for="development-identity">Test as</label>
+				<label for="development-identity">{m.dev_test_as()}</label>
 				<select id="development-identity" name="identity">
-					<option value="">Signed out</option>
+					<option value="">{m.dev_signed_out()}</option>
 					{#each data.developmentPeople as person}<option value={person.id} selected={data.user?.id === person.id}>{person.name}</option>{/each}
-					<option value="unknown" selected={data.state === 'unknown'}>Unknown Google account</option>
+					<option value="unknown" selected={data.state === 'unknown'}>{m.dev_unknown()}</option>
 				</select>
-				<button type="submit">Use identity</button>
+				<button type="submit">{m.dev_use()}</button>
 			</form>
-			<p>Local development only. Fictional identities and a saved example draw.</p>
+			<p>{m.dev_note()}</p>
 		</details>
 	{/if}
 </div>

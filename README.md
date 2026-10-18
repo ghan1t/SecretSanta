@@ -67,3 +67,9 @@ Select a Node deployment adapter before hosting. The scaffold retains `adapter-a
 - [Interactive UI preview](docs/mockups.html) — animated envelope and letter with fictional names.
 
 Generated with the official Svelte CLI. Implementation follows [Svelte LLM guidelines](https://svelte.dev/llms.txt); SvelteKit 3 uses `$app/env`, private variables declared in `src/env.ts`, and the Vite Kit plugin configuration.
+
+## Languages
+
+The live app supports English and Latvian through [Paraglide](https://paraglidejs.com/sveltekit). Edit copy in `messages/en.json` and `messages/lv.json`; keep message keys and `{name}` placeholders aligned. `npm run check`, `npm test`, and the Vite plugin compile the generated files in `src/lib/paraglide/` (ignored by Git).
+
+The header flag button shows the other language (🇱🇻 / 🇬🇧), switches directly without a dropdown, and remembers `en` or `lv` in a `santa_language` cookie for one year, with `SameSite=Lax` and `Secure` on HTTPS. English is the default. Server rendering and API error messages use the same request locale, isolated across requests. The document's `lang` attribute follows the selected language. Switching reloads the page and hides a revealed recipient. No translation service is called at runtime and no family data is sent for translation. Cloudflare/Google's own login screens are managed by those services. The standalone mockup remains a historical English design preview.

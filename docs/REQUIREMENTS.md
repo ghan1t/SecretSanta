@@ -40,3 +40,10 @@ Target a Node host with persistent private files. Back up and retain config/draw
 ## Remaining decisions
 
 Real Google-account emails, shared-mailbox handling (baseline requires unique emails), date/budget, participant list, hosting/domain/adapter, and any household exclusions. Deployment is not configured yet.
+
+### Language support
+- English and Latvian UI, including reveal/loading states, account guidance, and recipient API errors.
+- Accessible flag button in the header, showing the opposite language (🇱🇻 / 🇬🇧), with a translated accessible label and no dropdown.
+- Remember the explicit choice in a one-year language cookie; default to English.
+- Render the selected language on the server and set the HTML language attribute.
+- Keep translations in versioned message files using Paraglide; no runtime translation API or database.
