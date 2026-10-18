@@ -12,9 +12,33 @@ cp .env.example .env  # only if you do not already have .env
 npm run dev -- --host 127.0.0.1
 ```
 
-This workspace already has an ignored `.env` enabling `DEV_AUTH_ENABLED=true`. The development toolbar lets you test Alex, Jamie, Morgan, Sam, signed-out, and unknown-account states. These are fictional identities with a fixed example draw; there are no working passwords or codes anymore.
+This workspace has an ignored `.env` with `DEV_AUTH_ENABLED=true` to bypass Cloudflare locally. Choose the data source independently:
 
-The selector requires both SvelteKit development mode and the explicit flag. It is loopback-only and always uses synthetic fixtures, ignoring real private files. `npm run preview` and production ignore the flag and selector cookies, even if the flag is accidentally left enabled. Never expose the development server publicly; disable the flag when testing real Access through a tunnel.
+```dotenv
+DEV_AUTH_ENABLED=true
+DEV_FAMILY_SOURCE=fictional
+```
+
+`fictional` (the default) uses committed `config/family.example.json`: Alex, Jamie, Morgan, and Sam, with a fixed fictional draw. The dev toolbar explicitly labels these people **fictional**.
+
+To use your private family configuration with the same local identity selector:
+
+```dotenv
+DEV_AUTH_ENABLED=true
+DEV_FAMILY_SOURCE=private
+FAMILY_CONFIG_PATH=config/family.private.json
+DEV_DRAW_PATH=config/draw.dev.private.json
+```
+
+The private family file is prepared in this workspace with placeholder Gmail addresses and your exclusion rules. It is ignored by Git. A separate development draw is prepared at `config/draw.dev.private.json`; on a fresh checkout, generate it once with:
+
+```sh
+npm run draw -- config/family.private.json config/draw.dev.private.json
+```
+
+Restart the dev server after changing `.env`, then select a person in the dev toolbar. Source changes clear the active identity selection. Missing/invalid private files show an unavailable state, without falling back to fictional data or the production draw.
+
+The bypass requires SvelteKit development mode, `DEV_AUTH_ENABLED=true`, and a loopback hostname. `npm run preview` and production always require Cloudflare identity and use `FAMILY_CONFIG_PATH` / `DRAW_PATH`; development settings and selector cookies grant no access there. Disable the bypass when testing real Access through a tunnel.
 
 ```sh
 npm test
@@ -28,17 +52,17 @@ Tests verify signed/forged/expired/wrong-audience JWTs, fail-closed identity han
 
 This version targets a Node server with persistent private files. See [storage details](docs/STORAGE.md).
 
-1. Copy `config/family.example.json` to ignored `config/family.private.json`.
+1. Edit the prepared, ignored `config/family.private.json` and replace the placeholder Gmail addresses. For a fresh checkout, copy `config/family.example.json` first.
 2. Replace synthetic participants with real names and the exact email addresses returned by their Google accounts. Use one unique email per person.
 3. Set the event ID, year, date, and budget. Generate the draw once:
 
 ```sh
-npm run draw -- config/family.private.json data/draw.private.json
+npm run draw -- config/family.private.json config/draw.private.json
 ```
 
 The command uses secure randomness, validates a one-to-one draw with no self assignments, and atomically creates a private file. It refuses to overwrite an existing draw. The web app never generates or changes the draw.
 
-Keep both files outside `static/`, out of Git, backed up, and persistent across deployments. The operator can read the files. Do not generate the real draw until the participant list is final.
+Both private files live in `config/`, so a container needs only one read-only directory mount (see [container mount settings](docs/STORAGE.md#container-mount)). Keep them outside `static/`, out of Git, backed up, and persistent across deployments. The operator can read the files. Do not generate the real draw until the participant list is final.
 
 ## Cloudflare Google login
 
@@ -49,7 +73,7 @@ DEV_AUTH_ENABLED=false
 CF_ACCESS_ISSUER=https://your-team.cloudflareaccess.com
 CF_ACCESS_AUDIENCE=your-access-application-audience
 FAMILY_CONFIG_PATH=config/family.private.json
-DRAW_PATH=data/draw.private.json
+DRAW_PATH=config/draw.private.json
 ```
 
 Use an Access application with Google as its login method and an explicit family-email Allow policy. Protect the entire hostname, including the API, and secure the origin against bypass. The server validates `Cf-Access-Jwt-Assertion` using the team's JWKS, issuer, audience, algorithm, expiry, and required identity claims. Plain forwarded email headers grant nothing.
@@ -73,3 +97,14 @@ Generated with the official Svelte CLI. Implementation follows [Svelte LLM guide
 The live app supports English and Latvian through [Paraglide](https://paraglidejs.com/sveltekit). Edit copy in `messages/en.json` and `messages/lv.json`; keep message keys and `{name}` placeholders aligned. `npm run check`, `npm test`, and the Vite plugin compile the generated files in `src/lib/paraglide/` (ignored by Git).
 
 The header flag button shows the other language (🇱🇻 / 🇬🇧), switches directly without a dropdown, and remembers `en` or `lv` in a `santa_language` cookie for one year, with `SameSite=Lax` and `Secure` on HTTPS. English is the default. Server rendering and API error messages use the same request locale, isolated across requests. The document's `lang` attribute follows the selected language. Switching reloads the page and hides a revealed recipient. No translation service is called at runtime and no family data is sent for translation. Cloudflare/Google's own login screens are managed by those services. The standalone mockup remains a historical English design preview.
+
+Pairing exclusions are directional entries in the private config's `exclusions` array. The private file contains your mutual exclusion. This fictional example shows the format:
+
+```json
+"exclusions": [
+  { "giver": "alex", "recipient": "jamie" },
+  { "giver": "jamie", "recipient": "alex" }
+]
+```
+
+Use participant IDs in rules; self assignments are always forbidden. Saved draws are checked against these rules as well. Changing rules can invalidate an existing draw; the app will refuse to reveal it. Fictional mode uses a fixed example draw; private development mode uses its separate saved development draw. Generate the production draw once when the participant list and rules are final.

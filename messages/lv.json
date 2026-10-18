@@ -39,7 +39,7 @@
   "footer": "mazs Ziemassvētku noslēpums",
   "under_card": "priecīgi mazi noslēpumi",
   "dev_summary": "Izstrādes vide",
-  "dev_fictional": "izdomāti dalībnieki",
+  "dev_fictional": "izdomāti dalībnieki (fictional)",
   "dev_test_as": "Testēt kā",
   "dev_signed_out": "Bez pierakstīšanās",
   "dev_unknown": "Nezināms Google konts",
@@ -52,5 +52,8 @@
   "error_selection": "Dalībnieka izvēle nav atļauta.",
   "error_account": "Šī konta nav ģimenes dalībnieku sarakstā.",
   "error_assignment": "Tavs izlozes rezultāts vēl nav pieejams. Lūdzu, sazinies ar organizatoru.",
-  "switch_language": "Mainīt valodu uz {language}"
+  "switch_language": "Mainīt valodu uz {language}",
+  "dev_private": "privātā ģimene · bez Google pierakstīšanās",
+  "dev_unconfigured": "konfigurācija nav pieejama",
+  "dev_private_note": "Tikai vietējai izstrādei. Privātā ģimenes konfigurācija un atsevišķa testa izloze. Google pierakstīšanās ir atspējota."
 }

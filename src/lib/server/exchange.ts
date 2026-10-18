@@ -1,10 +1,12 @@
 export type Participant = { id: string; name: string; email: string };
+export type Exclusion = { giver: string; recipient: string };
 export type Family = {
 	eventId: string;
 	year: number;
 	exchangeDate: string;
 	budget: string;
 	participants: Participant[];
+	exclusions: Exclusion[];
 };
 export type Draw = { eventId: string; recipients: Record<string, string> };
 
@@ -37,7 +39,20 @@ export function parseFamily(value: unknown): Family {
 		emails.add(email);
 		return { id: entry.id, name: entry.name.trim(), email };
 	});
-	return { eventId: value.eventId, year: value.year as number, exchangeDate: value.exchangeDate, budget: value.budget, participants };
+	if (value.exclusions !== undefined && !Array.isArray(value.exclusions)) {
+		throw new Error('Exclusions must be an array.');
+	}
+	const exclusions = (value.exclusions ?? []).map((entry: unknown): Exclusion => {
+		if (!record(entry) || typeof entry.giver !== 'string' || typeof entry.recipient !== 'string' ||
+			!ids.has(entry.giver) || !ids.has(entry.recipient)) {
+			throw new Error('Exclusions must reference configured participant IDs.');
+		}
+		return { giver: entry.giver, recipient: entry.recipient };
+	});
+	return { eventId: value.eventId, year: value.year as number, exchangeDate: value.exchangeDate, budget: value.budget, participants, exclusions };
+}
+export function pairingAllowed(family: Family, giver: string, recipient: string): boolean {
+	return giver !== recipient && !family.exclusions.some((rule) => rule.giver === giver && rule.recipient === recipient);
 }
 export function parseDraw(value: unknown, family: Family): Draw {
 	if (!record(value) || value.eventId !== family.eventId || !record(value.recipients)) {
@@ -49,7 +64,7 @@ export function parseDraw(value: unknown, family: Family): Draw {
 	if (entries.length !== ids.size) throw new Error('Draw participants have changed.');
 	for (const [giver, recipient] of entries) {
 		if (!ids.has(giver) || typeof recipient !== 'string' || !ids.has(recipient) ||
-			giver === recipient || recipients.has(recipient)) throw new Error('Invalid saved draw.');
+			!pairingAllowed(family, giver, recipient) || recipients.has(recipient)) throw new Error('Invalid saved draw.');
 		recipients.add(recipient);
 	}
 	return { eventId: family.eventId, recipients: Object.fromEntries(entries) as Record<string, string> };

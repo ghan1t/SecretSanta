@@ -6,7 +6,7 @@
 - Cloudflare Access with Google login identifies participants without app signup, app passwords, or SMS/email codes.
 - The verified email maps to one participant in a private configuration file. No production name picker or shared family password.
 - A private, saved draw file stores giver-to-recipient IDs. A database is unnecessary while the app remains read-only.
-- Explicitly enabled, loopback-only development identities support local work without Cloudflare and use synthetic fixtures exclusively.
+- Explicitly enabled, loopback-only development identities support local work without Cloudflare with an independent data-source setting: committed fictional people or the ignored private family file with a separate development draw.
 
 ## Required behavior
 
@@ -24,7 +24,7 @@
 
 - Validate Cloudflare JWT signature/JWKS, algorithm, issuer, audience, expiry and applicable time claims, subject, email, and application-token type on every request. Ignore plain forwarded-email headers.
 - Configure Google-only authentication and explicit family-email access policies in Cloudflare. Secure origin ingress, protect all app/API paths, and remove bypass routes/hostnames.
-- Production ignores development flags/cookies and has no identity selector fallback. Development identities require SvelteKit dev mode plus an explicit environment flag and loopback hostname, and cannot read real family data.
+- Production ignores development flags/cookies and has no identity selector fallback. Development identities require SvelteKit dev mode plus an explicit environment flag and loopback hostname, with `DEV_FAMILY_SOURCE=fictional` by default. Explicit `private` selection reads the private family file and a separate development draw, clearly labeled in the toolbar.
 - Cloudflare manages login/session duration; no app session database is needed. Logout clears the Access application session but does not sign out of Google itself. Verify provider account-switch behavior before public use.
 - Require same-origin writes, keep recipient responses/pages private and uncached, avoid third-party analytics and secrets in logs, and return only the authenticated person's recipient display name.
 - File operators can see the draw. The app does not promise secrecy from its organizer or stop a user recording their own assignment.
@@ -35,11 +35,11 @@ Local-key JWT tests; participant/reveal authorization tests; file validation, st
 
 ## Storage and scope limits
 
-Target a Node host with persistent private files. Back up and retain config/draw together across deployments. Cloudflare Workers require a different storage backend. A database becomes useful with mutable wishlists/admin UI/audit records, not for the current read-only flow. Household exclusions, previous-year avoidance, reminders, and organizer UI remain future scope.
+Target a Node host with persistent private files. Back up and retain config/draw together across deployments. Cloudflare Workers require a different storage backend. A database becomes useful with mutable wishlists/admin UI/audit records, not for the current read-only flow. Directional pairing exclusions are configured in the family file and enforced on generation and saved-draw validation. Mutual exclusions are kept in the ignored private config. Previous-year avoidance, reminders, and organizer UI remain future scope.
 
 ## Remaining decisions
 
-Real Google-account emails, shared-mailbox handling (baseline requires unique emails), date/budget, participant list, hosting/domain/adapter, and any household exclusions. Deployment is not configured yet.
+Real Google-account emails, shared-mailbox handling (baseline requires unique emails), date/budget and hosting/domain/adapter. The real participant list and placeholder Gmail addresses are kept only in the ignored private family file. Deployment is not configured yet.
 
 ### Language support
 - English and Latvian UI, including reveal/loading states, account guidance, and recipient API errors.

@@ -4,9 +4,35 @@
   "exchangeDate": "25 December",
   "budget": "CHF 50",
   "participants": [
-    { "id": "alex", "name": "Alex", "email": "alex@example.test" },
-    { "id": "jamie", "name": "Jamie", "email": "jamie@example.test" },
-    { "id": "morgan", "name": "Morgan", "email": "morgan@example.test" },
-    { "id": "sam", "name": "Sam", "email": "sam@example.test" }
+    {
+      "id": "alex",
+      "name": "Alex",
+      "email": "alex@example.test"
+    },
+    {
+      "id": "jamie",
+      "name": "Jamie",
+      "email": "jamie@example.test"
+    },
+    {
+      "id": "morgan",
+      "name": "Morgan",
+      "email": "morgan@example.test"
+    },
+    {
+      "id": "sam",
+      "name": "Sam",
+      "email": "sam@example.test"
+    }
+  ],
+  "exclusions": [
+    {
+      "giver": "alex",
+      "recipient": "jamie"
+    },
+    {
+      "giver": "jamie",
+      "recipient": "alex"
+    }
   ]
 }

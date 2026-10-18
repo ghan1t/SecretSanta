@@ -1,7 +1,7 @@
 import example from '../../../config/family.example.json';
 import { parseFamily, parseDraw } from './exchange.js';
 
-// Synthetic fixtures are used ONLY in explicitly enabled local development mode.
+// Fictional people and this fixed draw are used only in fictional development mode.
 export const family = parseFamily(example);
 export const exampleDraw = parseDraw({
 	eventId: family.eventId,

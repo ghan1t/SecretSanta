@@ -29,7 +29,7 @@ src/lib/server/family.private.ts
 
 # Private file storage and IDE state
 config/*.private.json
-data/
+config/*.private.json.*.tmp
 
 # Generated translations and local inlang cache
 src/lib/paraglide/

@@ -3,6 +3,7 @@ import { dev } from '$app/env';
 import * as env from '$app/env/private';
 import type { Handle } from '@sveltejs/kit/hooks';
 import { accessConfig, DEVELOPMENT_COOKIE, localIdentityEnabled, verifyAccessToken } from '#lib/server/cloudflare.js';
+import { currentFamily, familySource } from '#lib/server/current-family.js';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const localMode = localIdentityEnabled(dev, env.DEV_AUTH_ENABLED);
@@ -17,11 +18,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 		const selection = event.cookies.get(DEVELOPMENT_COOKIE);
 		if (selection) {
-			// Ignore all real files and JWTs in this mode. IDs map only to synthetic fixtures.
-			const { family } = await import('#lib/server/family.example.js');
-			const participant = family.participants.find(({ id }) => id === selection);
-			event.locals.identity = { email: participant?.email ?? 'unknown@example.test', subject: `development:${selection}` };
-			event.locals.authStatus = 'authenticated';
+			try {
+				const source = familySource(true);
+				// Bind selection to the data source so switching files requires a new selection.
+				if (selection.startsWith(`${source}:`)) {
+					const family = await currentFamily(true);
+					const participant = family.participants.find(({ id }) => `${source}:${id}` === selection);
+					event.locals.identity = { email: participant?.email ?? 'unknown@example.test', subject: `development:${selection}` };
+					event.locals.authStatus = 'authenticated';
+				}
+			} catch {
+				event.locals.authStatus = 'unavailable';
+			}
 		}
 	} else {
 		try {

@@ -44,7 +44,7 @@
   "dev_signed_out": "Signed out",
   "dev_unknown": "Unknown Google account",
   "dev_use": "Use identity",
-  "dev_note": "Local development only. Fictional identities and a saved example draw.",
+  "dev_note": "Local development only. Fictional people and a saved example draw.",
   "error_retry": "Please try again.",
   "error_open": "We couldn’t open your assignment. Please try again.",
   "error_request": "This request could not be verified.",
@@ -52,5 +52,8 @@
   "error_selection": "No participant selection is accepted.",
   "error_account": "This account is not on the family list.",
   "error_assignment": "Your assignment is not available yet. Please contact the organizer.",
-  "switch_language": "Switch language to {language}"
+  "switch_language": "Switch language to {language}",
+  "dev_private": "private family · Google login bypassed",
+  "dev_unconfigured": "configuration unavailable",
+  "dev_private_note": "Local development only. Private family configuration and a separate development draw. Google login is bypassed."
 }

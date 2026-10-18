@@ -191,7 +191,7 @@
 
 	{#if data.localMode}
 		<details class="development-toolbar">
-			<summary>{m.dev_summary()} <span>· {m.dev_fictional()}</span></summary>
+			<summary>{m.dev_summary()} <span>· {data.developmentSource === 'fictional' ? m.dev_fictional() : data.developmentSource === 'private' ? m.dev_private() : m.dev_unconfigured()}</span></summary>
 			<form method="POST" action="/dev/identity" data-sveltekit-reload>
 				<label for="development-identity">{m.dev_test_as()}</label>
 				<select id="development-identity" name="identity">
@@ -201,7 +201,7 @@
 				</select>
 				<button type="submit">{m.dev_use()}</button>
 			</form>
-			<p>{m.dev_note()}</p>
+			<p>{data.developmentSource === 'fictional' ? m.dev_note() : m.dev_private_note()}</p>
 		</details>
 	{/if}
 </div>

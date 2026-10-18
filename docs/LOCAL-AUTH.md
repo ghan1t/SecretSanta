@@ -2,13 +2,13 @@
 
 ## Selected product flow
 
-Open app → Cloudflare Google login if needed → “Hello, Alex” → explicitly reveal the saved recipient. The identity determines the person. There is no production dropdown, family password, verification code, signup, or app-managed OAuth callback.
+Open app → Cloudflare Google login if needed → “Psst, Alex” → explicitly reveal the saved recipient. The identity determines the person. There is no production dropdown, family password, verification code, signup, or app-managed OAuth callback.
 
-## Local fictional identities
+## Local identity bypass and data sources
 
 Set `DEV_AUTH_ENABLED=true` in ignored `.env`, run `npm run dev -- --host 127.0.0.1`, and use the development toolbar. Test known people, unknown account, and signed-out. Switch identity or sign out while viewing a recipient to check the screen clears. The toolbar submits a same-origin POST and stores an HTTP-only development cookie. It intentionally offers no security against another local developer.
 
-This mode requires SvelteKit's `dev` value, the exact explicit flag, and a loopback hostname. It always reads checked-in synthetic fixtures, never private family/draw paths. Production and `npm run preview` ignore the cookie and flag. No URL parameter, plain email header, or client-supplied person ID grants production identity.
+This mode requires SvelteKit's `dev` value, the exact explicit flag, and a loopback hostname. `DEV_FAMILY_SOURCE=fictional` (default) uses checked-in fictional people and a fixed example draw. Set `DEV_FAMILY_SOURCE=private` to use `FAMILY_CONFIG_PATH` with a separate saved `DEV_DRAW_PATH` (e.g. `config/draw.dev.private.json`). Generate the development draw once with `npm run draw -- config/family.private.json config/draw.dev.private.json`; no request generates a draw. Missing private files fail closed. The dev toolbar labels the active source, and its HTTP-only cookie is bound to that source so a source switch requires selecting an identity again. Restart after changing the environment. Production and `npm run preview` ignore the cookie and flag. No URL parameter, plain email header, or client-supplied person ID grants production identity.
 
 ## Tests without an Access account
 

@@ -3,21 +3,21 @@ import { mkdir, writeFile, link, unlink } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFamily } from '../src/lib/server/storage.js';
-import { parseDraw } from '../src/lib/server/exchange.js';
+import { pairingAllowed, parseDraw } from '../src/lib/server/exchange.js';
 
 export async function generateDraw(configPath: string, outputPath: string) {
 	const family = await readFamily(configPath);
 	const ids = family.participants.map(({ id }) => id);
 	let shuffled: string[] = [];
-	// Uniform shuffle, rejecting self assignments. Expected attempts are about e.
+	// Reject invalid uniform shuffles to keep accepted draws uniform, including exclusions.
 	for (let attempt = 0; attempt < 10000; attempt++) {
 		shuffled = [...ids];
 		for (let i = shuffled.length - 1; i > 0; i--) {
 			const j = randomInt(i + 1);
 			[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
 		}
-		if (shuffled.every((id, index) => id !== ids[index])) break;
-		if (attempt === 9999) throw new Error('Could not generate a draw.');
+		if (shuffled.every((id, index) => pairingAllowed(family, ids[index], id))) break;
+		if (attempt === 9999) throw new Error('Could not generate a draw within 10000 attempts. Check whether the exclusions are too restrictive.');
 	}
 	const draw = parseDraw({ eventId: family.eventId, recipients: Object.fromEntries(ids.map((id, i) => [id, shuffled[i]])) }, family);
 	const destination = resolve(outputPath);
@@ -35,7 +35,7 @@ export async function generateDraw(configPath: string, outputPath: string) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	const [config, output, ...extra] = process.argv.slice(2);
 	if (!config || !output || extra.length) {
-		console.error('Usage: npm run draw -- config/family.private.json data/draw.private.json');
+		console.error('Usage: npm run draw -- config/family.private.json config/draw.private.json');
 		process.exitCode = 1;
 	} else {
 		try {
