@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { beforeNavigate } from '$app/navigation';
+	import { onDestroy } from 'svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -8,16 +9,56 @@
 	let message = $state('');
 	let pending: AbortController | null = null;
 	let version = 0;
+	let unfold = $state(0);
+	let animationFrame: number | undefined;
 
-	function hide() {
+	function smooth(value: number) {
+		const clamped = Math.max(0, Math.min(1, value));
+		return clamped * clamped * (3 - 2 * clamped);
+	}
+	const topFold = $derived(smooth(unfold / .62));
+	const leftFold = $derived(smooth((unfold - .16) / .7));
+	const rightFold = $derived(smooth((unfold - .22) / .7));
+	const bottomFold = $derived(smooth((unfold - .32) / .68));
+	const letterLift = $derived(smooth((unfold - .36) / .64));
+	const nameOpacity = $derived(smooth((unfold - .44) / .36));
+	const nameSize = $derived(Math.max(20, Math.min(56, 360 / Math.max(1, recipient?.length ?? 1))));
+
+	function animateEnvelope(target: number) {
+		if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+		animationFrame = undefined;
+		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { unfold = target; return; }
+		const from = unfold;
+		const start = performance.now();
+		const duration = Math.max(1, 1400 * Math.abs(target - from));
+		function frame(now: number) {
+			const elapsed = Math.min(1, (now - start) / duration);
+			unfold = from + (target - from) * (.5 - Math.cos(elapsed * Math.PI) / 2);
+			animationFrame = elapsed < 1 ? requestAnimationFrame(frame) : undefined;
+		}
+		animationFrame = requestAnimationFrame(frame);
+	}
+	function reset() {
+		hide(true);
+	}
+	onDestroy(() => {
+		if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+	});
+
+	function hide(immediately = false) {
 		version++;
 		pending?.abort();
 		pending = null;
 		recipient = null;
 		loading = false;
 		message = '';
+		if (immediately) {
+			if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+			animationFrame = undefined;
+			unfold = 0;
+		} else animateEnvelope(0);
 	}
-	beforeNavigate(hide);
+	beforeNavigate(reset);
 	async function reveal() {
 		if (loading) return;
 		loading = true;
@@ -31,6 +72,7 @@
 			if (!response.ok) { message = result.error ?? 'Please try again.'; return; }
 			if (typeof result.recipient?.name !== 'string') throw new Error('Invalid response');
 			recipient = result.recipient.name;
+			animateEnvelope(1);
 		} catch (error) {
 			if (requestVersion === version && !(error instanceof DOMException && error.name === 'AbortError')) message = 'We couldn’t open your assignment. Please try again.';
 		} finally {
@@ -44,7 +86,7 @@
 	<meta name="description" content="A little mystery for our family gift exchange." />
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
-<svelte:window onpagehide={hide} onpageshow={hide} />
+<svelte:window onpagehide={reset} onpageshow={reset} />
 
 {#snippet treeIcon()}
 	<svg viewBox="0 0 24 28" fill="none" aria-hidden="true"><path d="m12 2 7 9h-4l7 9H2l7-9H5l7-9Z" fill="currentColor" fill-opacity=".15" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /><path d="M12 20v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /><circle cx="12" cy="10" r="1" fill="#b65459" /><circle cx="8" cy="16" r="1" fill="#b58a41" /><circle cx="16" cy="17" r="1" fill="#b65459" /></svg>
@@ -59,7 +101,7 @@
 <div class="page-shell">
 	<header class="app-header">
 		<a class="wordmark" href="/" aria-label="Family Secret Santa home"><span class="brand-star" aria-hidden="true">{@render treeIcon()}</span> secret santa<span class="brand-dot" aria-hidden="true">.</span></a>
-		{#if data.user}<form method="POST" action="/logout" data-sveltekit-reload onsubmit={hide}><button type="submit" class="logout">Sign out <span aria-hidden="true">↗</span></button></form>{:else}<span class="family-label">family edition</span>{/if}
+		{#if data.user}<form method="POST" action="/logout" data-sveltekit-reload onsubmit={reset}><button type="submit" class="logout">Sign out <span aria-hidden="true">↗</span></button></form>{:else}<span class="family-label">family edition</span>{/if}
 	</header>
 
 	<main>
@@ -67,47 +109,56 @@
 			<div class="card-topline"><span>{data.event?.year ?? 'JUST FOR YOU'}</span><span class="postage-mark" aria-hidden="true">{@render snowIcon()}{@render treeIcon()}{@render giftIcon()}</span><span>SECRET SANTA</span></div>
 			<div class="card-content" aria-live="polite" aria-busy={loading}>
 				{#if data.state === 'ready' && data.user}
-					{#if recipient}
-						<p class="eyebrow">THE SECRET IS OUT</p>
-						<h1>Your person is…</h1>
-						<div class="recipient">
-							<span class="reveal-spark reveal-spark-one" aria-hidden="true">{@render snowIcon()}</span><span class="reveal-spark reveal-spark-two" aria-hidden="true">{@render treeIcon()}</span><span class="reveal-spark reveal-spark-three" aria-hidden="true">♡</span>
-							<span class="recipient-label">lucky them!</span>
-							<strong>{recipient}</strong>
-							<svg class="name-underline" viewBox="0 0 200 15" aria-hidden="true"><path d="M4 9Q85 0 195 7M29 13Q106 5 171 11" /></svg>
+					<div class="reveal-heading">
+						<p class="eyebrow">{recipient ? 'THE SECRET IS OUT' : 'A LITTLE SOMETHING FOR YOU'}</p>
+						<h1>{#if recipient}Your person is…{:else}Psst, {data.user.name}<span class="heading-star" aria-hidden="true">✧</span>{/if}</h1>
+						<p class="card-copy">{recipient ? 'Let the secret scheming begin.' : 'Your Christmas person is waiting.'}</p>
+					</div>
+					<div class="envelope-scene" class:is-open={recipient !== null}>
+						<span class="scene-spark spark-left" aria-hidden="true">{@render snowIcon()}</span>
+						<span class="scene-spark spark-right" aria-hidden="true">{@render treeIcon()}</span>
+						<div class="envelope-motion">
+						<svg class="letter-friend" style:transform={`scale(${1.15 - letterLift * .3})`} viewBox="0 0 320 300" fill="none" aria-hidden="true">
+							<!-- Envelope and letter share one persistent sway animation. -->
+							<g class="envelope-limbs" opacity={1 - smooth(unfold * 2)} aria-hidden="true">
+								<path d="m126 197-8 23-14-1m84-22 9 22 13-3M71 149l-13-7-8 5m199 1 13-11 8 3" stroke="#2e4e40" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+							</g>
+							<rect x="74" y="98" width="172" height="104" rx="9" fill="#e5ecd8" stroke="#52734f" stroke-width="1.7" />
+							<rect x="82" y="106" width="156" height="88" rx="2" stroke="#b8c8a7" stroke-dasharray="2 4" />
+
+							<!-- Tips pass through each crease and unfold to the outside. -->
+							<path class="envelope-flap flap-left" d={`M83 98Q74 98 74 107V193Q74 202 83 202L${162 - leftFold * 154} 150Z`} fill={leftFold < .5 ? '#c9d9bd' : '#dce6cb'} stroke="#52734f" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true" />
+							<path class="envelope-flap flap-right" d={`M237 98Q246 98 246 107V193Q246 202 237 202L${158 + rightFold * 154} 150Z`} fill={rightFold < .5 ? '#c3d5b6' : '#dce6cb'} stroke="#52734f" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true" />
+							<path class="envelope-flap flap-bottom" d={`M74 193Q74 202 83 202H237Q246 202 246 193L160 ${137 + bottomFold * 126}Z`} fill={bottomFold < .5 ? '#c9d9bd' : '#e0e9d0'} stroke="#52734f" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true" />
+							<g transform={`translate(0 ${bottomFold * 64})`} opacity={1 - smooth(bottomFold * 3)} aria-hidden="true">
+								<path d="M147 173v5m26-5v5" stroke="#2e4e40" stroke-width="3.5" stroke-linecap="round" />
+								<path d="M155 185q6 7 12 0" stroke="#2e4e40" stroke-width="2.5" stroke-linecap="round" />
+								<ellipse cx="138" cy="184" rx="6" ry="3" fill="#eaa3a5" /><ellipse cx="182" cy="184" rx="6" ry="3" fill="#eaa3a5" />
+							</g>
+							<path class="envelope-flap flap-top" d={`M74 107Q74 98 83 98H237Q246 98 246 107L160 ${163 - topFold * 126}Z`} fill={topFold < .5 ? '#e0e9d3' : '#e5ecd8'} stroke="#52734f" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true" />
+							<g transform={`translate(0 ${-topFold * 94})`} opacity={1 - smooth(topFold * 2)} aria-hidden="true"><path d="m159 143-7-7c-9-9 4-18 9-8 6-10 18-1 9 8l-8 7Z" fill="#b65459" /></g>
+							<g transform={`translate(${-topFold * 18} ${-topFold * 33}) rotate(12 218 91)`} aria-hidden="true">
+								<path d="M190 94q3-35 33-32-12 8 10 32Z" fill="#b65459" stroke="#8d4144" stroke-width="1.5" />
+								<rect x="185" y="89" width="54" height="12" rx="6" fill="#fffaf0" stroke="#2e4e40" stroke-width="1.5" />
+								<circle cx="224" cy="63" r="8" fill="#fffaf0" stroke="#2e4e40" stroke-width="1.5" />
+							</g>
+						</svg>
+						<div class="letter-paper" style:transform={`translate(-50%, -50%) translate3d(0, ${28 - letterLift * 58}px, ${-60 + letterLift * 110}px) rotateX(${(1 - letterLift) * 55}deg) scale(${.5 + letterLift * .5})`} style:opacity={nameOpacity} aria-hidden={recipient === null || nameOpacity < .99}>
+							<div class="recipient" style:--name-size={`${nameSize}px`}>
+								<span class="paper-spark" aria-hidden="true">✧</span>
+								<span class="recipient-label">you’re gifting to</span>
+								<strong>{recipient ?? ''}</strong>
+								<svg class="name-underline" viewBox="0 0 150 12" aria-hidden="true"><path d="M4 6Q68 0 145 5M25 10Q82 4 127 9" /></svg>
+								<span class="paper-signoff">with a little Christmas magic ♡</span>
+							</div>
 						</div>
-						<p class="card-copy">Let the secret scheming begin.</p>
-						<button type="button" class="primary" onclick={hide}>Hide my person <span aria-hidden="true">♡</span></button>
-						<p class="tiny-note">Your lips are sealed. Right?</p>
-					{:else}
-						<p class="eyebrow">A LITTLE SOMETHING FOR YOU</p>
-						<h1>Psst, {data.user.name}<span class="heading-star" aria-hidden="true">✧</span></h1>
-						<p class="card-copy">Your Christmas person is waiting.</p>
-						<div class="letter-scene" aria-hidden="true">
-							<span class="scene-spark spark-left">{@render snowIcon()}</span><span class="scene-spark spark-right">{@render treeIcon()}</span><span class="scene-dot">•</span>
-							<svg class="letter-friend" viewBox="0 0 260 210" fill="none">
-								<path d="M98 167l-7 21-13-1m83-20 8 19 13-3" stroke="#2e4e40" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-								<g class="envelope-body">
-									<rect x="46" y="55" width="169" height="115" rx="9" fill="#c9d9bd" stroke="#2e4e40" stroke-width="2.5" />
-									<path d="m48 162 64-52m101 52-65-52" stroke="#96ae8e" stroke-width="2" />
-									<path d="m49 59 72 57c5 4 11 4 16 0l75-57" fill="#e0e9d3" stroke="#2e4e40" stroke-width="2.5" stroke-linejoin="round" />
-									<path d="M116 135v5m27-5v5" stroke="#2e4e40" stroke-width="3.5" stroke-linecap="round" />
-									<path d="M125 146q6 7 12 0" stroke="#2e4e40" stroke-width="2.5" stroke-linecap="round" />
-									<ellipse cx="107" cy="145" rx="6" ry="3" fill="#eaa3a5" /><ellipse cx="153" cy="145" rx="6" ry="3" fill="#eaa3a5" />
-									<path d="m128 100-7-7c-9-9 4-18 9-8 6-10 18-1 9 8l-8 7Z" fill="#b65459" />
-								</g>
-								<g transform="rotate(12 181 49)">
-									<path d="M150 52q3-35 33-32-12 8 10 32Z" fill="#b65459" stroke="#8d4144" stroke-width="1.5" />
-									<rect x="145" y="47" width="54" height="12" rx="6" fill="#fffaf0" stroke="#2e4e40" stroke-width="1.5" />
-									<circle cx="184" cy="21" r="8" fill="#fffaf0" stroke="#2e4e40" stroke-width="1.5" />
-								</g>
-								<path d="m42 108-13-7-8 5m199 1 13-11 8 3" stroke="#2e4e40" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-							</svg>
-							<span class="letter-caption">a little North Pole post</span>
 						</div>
-						<button type="button" class="primary" onclick={reveal} disabled={loading}>{loading ? 'A little drumroll…' : 'Reveal my person'} <span aria-hidden="true">✧</span></button>
-						<p class="tiny-note">For your eyes only.</p>
-					{/if}
+						<span class="letter-caption" aria-hidden="true">{recipient ? 'a secret, unfolded' : 'a little North Pole post'}</span>
+					</div>
+					<button type="button" class="primary" onclick={() => recipient ? hide() : reveal()} disabled={loading}>
+						{loading ? 'A little drumroll…' : recipient ? 'Hide my person' : 'Reveal my person'} <span aria-hidden="true">{recipient ? '♡' : '✧'}</span>
+					</button>
+					<p class="tiny-note">{recipient ? 'Your lips are sealed. Right?' : 'For your eyes only.'}</p>
 				{:else}
 					<div class="welcome-doodle" aria-hidden="true">{data.state === 'unknown' ? '?' : data.state === 'unavailable' ? '☁' : '♡'}<span>✧</span></div>
 					{#if data.state === 'unknown'}

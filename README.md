@@ -64,6 +64,6 @@ Select a Node deployment adapter before hosting. The scaffold retains `adapter-a
 - [Local authentication and Cloudflare setup](docs/LOCAL-AUTH.md)
 - [File storage and operations](docs/STORAGE.md)
 - [Original alternatives research](docs/AUTH-OPTIONS.md)
-- [Mobile UI previews](docs/mockups.html) — sealed and revealed states with fictional names.
+- [Interactive UI preview](docs/mockups.html) — animated envelope and letter with fictional names.
 
 Generated with the official Svelte CLI. Implementation follows [Svelte LLM guidelines](https://svelte.dev/llms.txt); SvelteKit 3 uses `$app/env`, private variables declared in `src/env.ts`, and the Vite Kit plugin configuration.

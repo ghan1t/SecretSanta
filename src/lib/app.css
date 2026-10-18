@@ -62,11 +62,39 @@ main { padding: 4px 0 0; }
 h1 { font: 400 clamp(30px, 9vw, 40px)/1.12 Georgia, serif; letter-spacing: -1.6px; margin: 0 0 12px; overflow-wrap: anywhere; }
 .heading-star { display: inline-block; color: #b65459; margin-left: 3px; font-size: 30px; vertical-align: top; transform: rotate(12deg); }
 .card-copy { color: var(--muted); font-size: 12px; line-height: 1.8; margin: 0; }
-.letter-scene { position: relative; height: 216px; margin: 0 -10px 5px; }
-.letter-friend { position: absolute; width: 238px; height: 192px; top: 0; left: 50%; margin-left: -119px; transform: rotate(-7deg); animation: letter-sway 5s ease-in-out infinite; }
+.reveal-heading { min-height: 100px; }
+.envelope-scene { position: relative; height: 260px; margin: -2px -12px 5px; }
+.envelope-motion {
+	position: absolute;
+	inset: 0 0 10px;
+	perspective: 700px;
+	transform-style: preserve-3d;
+	transform-origin: 50% 50%;
+	animation: letter-sway 5s ease-in-out infinite;
+}
+.letter-friend { position: absolute; inset: 0; width: 100%; height: 100%; }
+.letter-paper {
+	position: absolute;
+	left: 50%;
+	top: 52%;
+	width: 84%;
+	min-height: 166px;
+	padding: 18px 14px 15px;
+	border: 1px solid #d2c7ab;
+	border-radius: 8px;
+	background: linear-gradient(180deg, #fffdf5 72%, #f0eadb 72.5%, #fffdf5 73.5%);
+	box-shadow: 0 9px 18px #314b3220, 0 2px 3px #314b3210;
+	transform-origin: 50% 65%;
+	backface-visibility: hidden;
+	pointer-events: none;
+}
+.letter-paper::before { content: ''; position: absolute; inset: 8px; border: 1px dashed #ddd2b9; border-radius: 3px; pointer-events: none; }
+.paper-spark { color: #b58a41; font: 19px Georgia, serif; line-height: 1; margin-bottom: 6px; }
+.paper-signoff { color: #8b7453; font: italic 10px Georgia, serif; margin-top: 11px; }
+.envelope-flap { transition: fill .2s ease; }
 .scene-spark { position: absolute; color: #b88c40; font: 30px Georgia, serif; }
-.spark-left { top: 33px; left: 6%; transform: rotate(14deg); }
-.spark-right { top: 81px; right: 2%; font-size: 38px; }
+.spark-left { top: 34px; left: 1%; transform: rotate(14deg); }
+.spark-right { top: 177px; right: 1%; font-size: 38px; }
 .scene-dot { position: absolute; top: 142px; left: 13%; color: #b65459; }
 .letter-caption { position: absolute; bottom: 0; left: 0; width: 100%; color: #8b7453; font: italic 13px Georgia, serif; transform: rotate(-4deg); }
 .primary {
@@ -98,16 +126,10 @@ h1 { font: 400 clamp(30px, 9vw, 40px)/1.12 Georgia, serif; letter-spacing: -1.6p
 .card-footer span { color: #b65459; font-size: 12px; }
 .under-card { text-align: center; color: #7e8c71; font: italic 12px Georgia, serif; margin: 27px 0 0; transform: rotate(-2deg); }
 .under-card span { color: #b65459; margin-left: 5px; }
-.recipient { position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 213px; margin: 12px -4px 3px; }
-.recipient::before { content: ''; position: absolute; inset: 23px 9px 28px; background: #e2e9d5; border-radius: 48% 55% 46% 52%; transform: rotate(-6deg); }
-.recipient-label { z-index: 1; font: italic 14px Georgia, serif; color: #8a6e48; transform: rotate(-7deg); margin-bottom: 10px; }
-.recipient strong { position: relative; font: 400 clamp(38px, 13vw, 58px)/1.08 Georgia, serif; letter-spacing: -2px; max-width: 100%; overflow-wrap: anywhere; }
-.name-underline { z-index: 1; width: 150px; height: 14px; margin-top: 5px; stroke: #b65459; stroke-width: 2; fill: none; stroke-linecap: round; }
-.reveal-spark { position: absolute; z-index: 1; color: #b88c40; animation: sparkle-in .6s ease-out both; }
-.reveal-spark-one { top: 12px; left: 7%; font-size: 30px; transform: rotate(-14deg); }
-.reveal-spark-two { bottom: 22px; right: 4%; font-size: 35px; animation-delay: .1s; }
-.reveal-spark-three { top: 19px; right: 9%; color: #b65459; font-size: 22px; animation-delay: .2s; }
-.is-revealed .card-copy { margin-top: 12px; }
+.recipient { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; color: var(--ink); }
+.recipient-label { font: italic 12px Georgia, serif; color: #8a6e48; margin-bottom: 5px; }
+.recipient strong { font: 400 min(14vw, var(--name-size, 56px))/1.12 Georgia, serif; letter-spacing: -1px; max-width: 100%; overflow-wrap: anywhere; text-align: center; }
+.name-underline { width: 135px; height: 10px; margin-top: 3px; stroke: #b65459; stroke-width: 1.5; fill: none; stroke-linecap: round; }
 .welcome-doodle { position: relative; display: grid; place-items: center; width: 101px; height: 101px; border: 1.5px solid #b8c7aa; background: var(--sage); border-radius: 45% 52% 45% 54%; margin: 0 auto 26px; font: 54px Georgia, serif; transform: rotate(-9deg); }
 .welcome-doodle span { position: absolute; right: -19px; top: -8px; color: #b88c40; font-size: 38px; }
 .local-help { padding: 15px; margin: 24px 0 0; font-size: 12px; line-height: 1.7; color: #63745d; background: #eaf0df; border: 1px dashed #c5d1b9; border-radius: 12px; }
@@ -126,8 +148,8 @@ h1 { font: 400 clamp(30px, 9vw, 40px)/1.12 Georgia, serif; letter-spacing: -1.6p
 	.page-shell { padding-top: 22px; }
 	.app-header { padding-bottom: 35px; }
 	.card-content { padding: 35px 36px 28px; }
-	.letter-scene { height: 227px; margin-top: 7px; }
-	.letter-friend { width: 255px; height: 206px; margin-left: -127px; }
+	.envelope-scene { height: 280px; }
+	.letter-paper { min-height: 188px; padding: 23px 18px 20px; }
 	.card-topline, .card-footer { margin-left: 25px; margin-right: 25px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -139,7 +161,5 @@ h1 { font: 400 clamp(30px, 9vw, 40px)/1.12 Georgia, serif; letter-spacing: -1.6p
 .scene-spark svg { display: block; width: 30px; height: 34px; }
 .spark-left { color: #b58a41; }
 .spark-right { color: #52734f; }
-.reveal-spark svg { display: block; width: 29px; height: 33px; }
-.reveal-spark-two { color: #52734f; }
 .card-footer span { display: inline-flex; color: #52734f; }
 .card-footer svg { width: 12px; height: 16px; }
