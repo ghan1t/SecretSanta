@@ -89,8 +89,6 @@ Use [compose.yaml](compose.yaml) with Caddy on the host. Prepare `config/family.
 ```dotenv
 CF_ACCESS_ISSUER=https://your-team.cloudflareaccess.com
 CF_ACCESS_AUDIENCE=your-access-application-audience
-# Optional: use the published image instead of building locally.
-SANTA_IMAGE=ghcr.io/your-owner/your-repository:latest
 # Match the host owner of config/ and its private files (id -u / id -g).
 SANTA_UID=1000
 SANTA_GID=1000
@@ -144,7 +142,7 @@ Request flow: browser → Cloudflare Access (Google login) → Caddy → Secret 
 For Caddy running on the same host as the example Compose service:
 
 ```caddyfile
-santa.example.com {
+http://santa.example.com {
     reverse_proxy 127.0.0.1:3000 {
         # Already forwarded by default; explicit here to document the contract.
         header_up Cf-Access-Jwt-Assertion {http.request.header.Cf-Access-Jwt-Assertion}
@@ -174,7 +172,7 @@ Generated with the official Svelte CLI. Implementation follows [Svelte LLM guide
 
 The live app supports English and Latvian through [Paraglide](https://paraglidejs.com/sveltekit). Edit copy in `messages/en.json` and `messages/lv.json`; keep message keys and `{name}` placeholders aligned. `npm run check`, `npm test`, and the Vite plugin compile the generated files in `src/lib/paraglide/` (ignored by Git).
 
-The header flag button shows the other language (🇱🇻 / 🇬🇧), switches directly without a dropdown, and remembers `en` or `lv` in a `santa_language` cookie for one year, with `SameSite=Lax` and `Secure` on HTTPS. English is the default. Server rendering and API error messages use the same request locale, isolated across requests. The document's `lang` attribute follows the selected language. Switching reloads the page and hides a revealed recipient. No translation service is called at runtime and no family data is sent for translation. Cloudflare/Google's own login screens are managed by those services. The standalone mockup remains a historical English design preview.
+The header flag button shows the other language (🇱🇻 / 🇬🇧), switches directly without a dropdown, and remembers `en` or `lv` in a `santa_language` cookie for one year, with `SameSite=Lax` and `Secure` on HTTPS. A saved language choice takes priority; otherwise the app detects the browser’s preferred supported language (English or Latvian), with Latvian as the fallback when neither matches. Existing language cookies remain respected. Server rendering and API error messages use the same request locale, isolated across requests. The document's `lang` attribute follows the selected language. Switching reloads the page and hides a revealed recipient. No translation service is called at runtime and no family data is sent for translation. Cloudflare/Google's own login screens are managed by those services. The standalone mockup remains a historical English design preview.
 
 Pairing exclusions are directional entries in the private config's `exclusions` array. The private file contains your mutual exclusion. This fictional example shows the format:
 

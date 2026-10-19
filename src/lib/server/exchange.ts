@@ -3,8 +3,6 @@ export type Exclusion = { giver: string; recipient: string };
 export type Family = {
 	eventId: string;
 	year: number;
-	exchangeDate: string;
-	budget: string;
 	participants: Participant[];
 	exclusions: Exclusion[];
 };
@@ -22,7 +20,6 @@ export function normalizeEmail(email: string): string {
 }
 export function parseFamily(value: unknown): Family {
 	if (!record(value) || !nonempty(value.eventId) || !Number.isInteger(value.year) ||
-		!nonempty(value.exchangeDate) || typeof value.budget !== 'string' ||
 		!Array.isArray(value.participants) || value.participants.length < 2) {
 		throw new Error('Invalid family configuration.');
 	}
@@ -49,7 +46,7 @@ export function parseFamily(value: unknown): Family {
 		}
 		return { giver: entry.giver, recipient: entry.recipient };
 	});
-	return { eventId: value.eventId, year: value.year as number, exchangeDate: value.exchangeDate, budget: value.budget, participants, exclusions };
+	return { eventId: value.eventId, year: value.year as number, participants, exclusions };
 }
 export function pairingAllowed(family: Family, giver: string, recipient: string): boolean {
 	return giver !== recipient && !family.exclusions.some((rule) => rule.giver === giver && rule.recipient === recipient);

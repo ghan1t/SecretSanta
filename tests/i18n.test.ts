@@ -13,7 +13,7 @@ describe('English and Latvian localization', () => {
 			expect(lv[key].match(/\{[^}]+\}/g) ?? []).toEqual(en[key].match(/\{[^}]+\}/g) ?? []);
 		}
 	});
-	it('isolates simultaneous request locales and defaults invalid cookies to English', async () => {
+	it('isolates simultaneous request locales and falls back to Latvian for invalid cookies', async () => {
 		const render = (cookie: string, delay: number) => paraglideMiddleware(
 			new Request('http://localhost/', { headers: { cookie } }),
 			async () => {
@@ -27,7 +27,26 @@ describe('English and Latvian localization', () => {
 		expect(await Promise.all(responses.map((response) => response.json()))).toEqual([
 			{ locale: 'lv', text: lv.reveal_person },
 			{ locale: 'en', text: en.reveal_person },
-			{ locale: 'en', text: en.reveal_person }
+			{ locale: 'lv', text: lv.reveal_person }
 		]);
+	});
+
+	it.each([
+		['lv-LV,lv;q=0.9,en;q=0.8', '', 'lv'],
+		['en-GB,en;q=0.9', '', 'en'],
+		['de-DE,de;q=0.9', '', 'lv'],
+		['', '', 'lv'],
+		['en;q=0.5,lv;q=0.9', '', 'lv'],
+		['lv-LV', 'santa_language=en', 'en'],
+		['en-US', 'santa_language=lv', 'lv'],
+		['en-US', 'santa_language=invalid', 'en']
+	])('resolves browser preference %s with cookie %s as %s', async (language, cookie, expected) => {
+		const response = await paraglideMiddleware(
+			new Request('http://localhost/', { headers: { 'accept-language': language, cookie } }),
+			() => new Response(JSON.stringify({ locale: getLocale(), text: m.reveal_person() }))
+		);
+		expect(await response.json()).toEqual({
+			locale: expected, text: expected === 'lv' ? lv.reveal_person : en.reveal_person
+		});
 	});
 });

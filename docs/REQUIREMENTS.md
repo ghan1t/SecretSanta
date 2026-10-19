@@ -15,7 +15,7 @@
 3. Unknown accounts see a helpful message and no family/assignment details. Missing or invalid identities cannot retrieve assignments.
 4. No request can choose a different giver. The reveal endpoint derives the giver exclusively from the verified server identity.
 5. Allow hiding and revealing again, logout through Access, and deliberate account switching on shared devices. Clear visible recipients on navigation/page hide; do not serialize assignments into initial HTML/page data.
-6. Read configured event ID/year, celebration date, budget, and participants. Keep all real emails/assignments outside Git and public assets.
+6. Read configured event ID/year and participants. Keep all real emails/assignments outside Git and public assets.
 7. Generate one draw with secure randomness, no self assignments, and exactly one giver/recipient occurrence per participant. Server initialization creates a complete draw only when absent, before responding to requests; builds skip generation. Reuse existing valid files without changing them, handle concurrent starts atomically, and never print pairings. Keep the optional organizer command. Never draw in page loads or reveal handlers.
 8. Reject malformed config, duplicate IDs/emails, mismatched events/participant sets, and invalid draws. Missing family configuration or invalid existing draws fail initialization without a redraw. Only a missing draw permits automatic generation at initialization; an absent file during reveal fails closed.
 9. Use a mobile-first, single-card layout centered on reveal/hide, with short copy, whimsical details, and no budget information. Support small screens, keyboard interaction, visible focus, labeled controls, accessible error/status announcements, and reduced motion.
@@ -39,11 +39,11 @@ Target a Node host with persistent private files. Back up and retain config/draw
 
 ## Remaining decisions
 
-Real Google-account emails, shared-mailbox handling (baseline requires unique emails), date/budget and hosting/domain/adapter. The real participant list and placeholder Gmail addresses are kept only in the ignored private family file. Deployment is not configured yet.
+Real Google-account emails, shared-mailbox handling (baseline requires unique emails), hosting/domain. The real participant list and placeholder Gmail addresses are kept only in the ignored private family file. Deployment is not configured yet.
 
 ### Language support
 - English and Latvian UI, including reveal/loading states, account guidance, and recipient API errors.
 - Accessible flag button in the header, showing the opposite language (🇱🇻 / 🇬🇧), with a translated accessible label and no dropdown.
-- Remember the explicit choice in a one-year language cookie; default to English.
+- Remember the explicit choice in a one-year language cookie; otherwise detect the browser’s preferred supported language and fall back to Latvian.
 - Render the selected language on the server and set the HTML language attribute.
 - Keep translations in versioned message files using Paraglide; no runtime translation API or database.

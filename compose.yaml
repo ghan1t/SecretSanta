@@ -1,18 +1,16 @@
 services:
   santa:
-    # Set SANTA_IMAGE to ghcr.io/<owner>/<repository>:latest to use the CI image.
-    image: ${SANTA_IMAGE:-secret-santa:local}
+    # Set SANTA_IMAGE to ghcr.io/ghan1t/secretsanta:latest to use the CI image.
+    image: ghcr.io/ghan1t/secretsanta:latest
     build: .
     restart: unless-stopped
     init: true
     # Match the owner of the host config directory, especially for mode-600 files.
     user: "${SANTA_UID:-1000}:${SANTA_GID:-1000}"
     ports:
-      # Caddy running on the host connects here; never expose the app publicly.
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
     environment:
       NODE_ENV: production
-      HOST: 0.0.0.0
       PORT: "3000"
       PROTOCOL_HEADER: x-forwarded-proto
       DEV_AUTH_ENABLED: "false"
