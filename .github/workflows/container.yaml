@@ -2,7 +2,7 @@ name: Container
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
   workflow_dispatch:
 
@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       semver: ${{ steps.gitversion.outputs.semVer }}
-      version: ${{ steps.gitversion.outputs.majorMinorPatch }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -33,7 +32,7 @@ jobs:
           configFilePath: GitVersion.yml
       - name: Show calculated version
         env:
-          VERSION: ${{ steps.gitversion.outputs.fullSemVer }}
+          VERSION: ${{ steps.gitversion.outputs.semVer }}
         run: echo "Calculated version $VERSION" >> "$GITHUB_STEP_SUMMARY"
 
   validate:
@@ -66,44 +65,51 @@ jobs:
         with:
           images: ${{ steps.image.outputs.name }}
           tags: |
-            type=raw,value=candidate-${{ needs.version.outputs.semver }}
-            type=ref,event=pr
-            type=sha
+            type=raw,value=${{ needs.version.outputs.semver }}
+      - name: Prepare image artifact directory
+        run: mkdir -p "$RUNNER_TEMP/release-bundle"
       - uses: docker/build-push-action@v6
+        id: build
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: false
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ needs.version.outputs.semver }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: mode=max
+          outputs: type=oci,dest=${{ runner.temp }}/release-bundle/image.tar
 
-      - name: Save tested release version
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      - name: Save tested image metadata
         env:
-          VERSION: ${{ needs.version.outputs.version }}
-          SEMVER: ${{ needs.version.outputs.semver }}
+          VERSION: ${{ needs.version.outputs.semver }}
         run: |
-          mkdir -p release-metadata
           node --input-type=module -e '
             import { writeFileSync } from "node:fs";
-            writeFileSync("release-metadata/version.json", JSON.stringify({
+            import { sha256 } from "./.github/scripts/release-utils.mjs";
+            const directory = `${process.env.RUNNER_TEMP}/release-bundle`;
+            writeFileSync(`${directory}/version.json`, JSON.stringify({
               version: process.env.VERSION,
-              semver: process.env.SEMVER,
-              sha: process.env.GITHUB_SHA
+              sha: process.env.GITHUB_SHA,
+              branch: process.env.GITHUB_REF_NAME,
+              repository: process.env.GITHUB_REPOSITORY,
+              runId: process.env.GITHUB_RUN_ID,
+              attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+              archiveSha256: await sha256(`${directory}/image.tar`)
             }));
           '
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
-          name: release-metadata
-          path: release-metadata/version.json
+          name: release-bundle-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-bundle/
           if-no-files-found: error
-          retention-days: 90
+          compression-level: 0
+          retention-days: 30
       - name: Explain manual publication
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request'
         run: |
-          echo "Checks and container build passed. Nothing has been published." >> "$GITHUB_STEP_SUMMARY"
-          echo "To release, run the Publish release workflow on main with run ID $GITHUB_RUN_ID." >> "$GITHUB_STEP_SUMMARY"
+          echo "Checks and image build passed. Nothing has been published." >> "$GITHUB_STEP_SUMMARY"
+          echo "Run Publish release on main with run ID $GITHUB_RUN_ID to publish this saved image." >> "$GITHUB_STEP_SUMMARY"

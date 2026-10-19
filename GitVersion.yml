@@ -1,25 +1,41 @@
-# Simplified GitFlow: short-lived feature/hotfix branches merge into main.
-# Releases are approved in Actions, which creates the version tag automatically.
+# Publishing is always manual in Actions. These modes control version calculation.
 workflow: GitHubFlow/v1
+mode: ManualDeployment
 tag-prefix: '[vV]'
 commit-message-incrementing: Enabled
 branches:
   main:
     regex: ^main$
-    mode: ManualDeployment
+    mode: ContinuousDeployment
     label: ''
-    increment: Patch
+    increment: Minor
     prevent-increment:
       of-merged-branch: true
-      when-current-commit-tagged: true
+      when-current-commit-tagged: false # ignore manual tags on main
+    is-main-branch: true
+    is-release-branch: true
+    source-branches:
+      - feature
+      - hotfix
+      - pull-request
+      - unknown
   feature:
-    regex: ^features?[/-](?<BranchName>.+)
-    mode: ContinuousDelivery
-    increment: Inherit
+    regex: ^feature?[/-](?<BranchName>.+)
+    mode: ManualDeployment
+    label: 'alpha-{BranchName}'
+    increment: Minor
     source-branches: [main]
+    tracks-release-branches: true
+    track-merge-target: true
+    is-release-branch: false
   hotfix:
     regex: ^hotfix(es)?[/-](?<BranchName>.+)
-    mode: ContinuousDelivery
-    label: beta
+    mode: ManualDeployment
+    label: '{BranchName}'
     increment: Patch
     source-branches: [main]
+    track-merge-target: true
+  pull-request:
+    mode: ManualDeployment
+  unknown:
+    mode: ManualDeployment

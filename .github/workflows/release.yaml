@@ -1,11 +1,11 @@
 name: Publish release
-run-name: Release from CI run ${{ inputs.run_id }}
+run-name: Publish image from CI run ${{ inputs.run_id }}
 
 on:
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'Successful Container workflow run ID for the current main commit'
+        description: 'Successful Container workflow run ID (main, feature or hotfix branch)'
         required: true
         type: string
 
@@ -13,7 +13,6 @@ permissions:
   contents: read
   actions: read
 
-# Serialize manual releases, including attempts to release the same version.
 concurrency:
   group: publish-release
   cancel-in-progress: false
@@ -21,12 +20,16 @@ concurrency:
 jobs:
   verify:
     name: Verify successful CI run
+    # Run the trusted publication workflow from main, even for branch images.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       sha: ${{ steps.run.outputs.sha }}
+      branch: ${{ steps.run.outputs.branch }}
+      attempt: ${{ steps.run.outputs.attempt }}
     steps:
-      - name: Verify the run tested current main in this repository
+      - uses: actions/checkout@v6
+      - name: Verify successful run and its branch head
         id: run
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -36,24 +39,21 @@ jobs:
             echo "::error::Enter the numeric run ID from the successful Container workflow URL."
             exit 1
           fi
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > run.json
-          workflow_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/container.yaml" --jq '.id')
-          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
-          jq -e --arg repo "$GITHUB_REPOSITORY" --arg latest "$latest" --argjson workflow "$workflow_id" '
-            .repository.full_name == $repo and
-            .workflow_id == $workflow and
-            .head_branch == "main" and
-            .head_sha == $latest and
-            (.event == "push" or .event == "workflow_dispatch") and
-            .status == "completed" and .conclusion == "success"
-          ' run.json > /dev/null || {
-            echo "::error::Choose a successful Container run for the current head of main."
-            exit 1
-          }
-          echo "sha=$latest" >> "$GITHUB_OUTPUT"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > "$RUNNER_TEMP/run.json"
+          export WORKFLOW_ID=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/container.yaml" --jq '.id')
+          node --input-type=module -e '
+            import { readFileSync, appendFileSync } from "node:fs";
+            import { execFileSync } from "node:child_process";
+            import { validateCiRun } from "./.github/scripts/release-utils.mjs";
+            const run = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/run.json`, "utf8"));
+            const target = validateCiRun(run, process.env.GITHUB_REPOSITORY, Number(process.env.WORKFLOW_ID));
+            const ref = execFileSync("gh", ["api", `repos/${process.env.GITHUB_REPOSITORY}/git/ref/heads/${encodeURIComponent(target.branch)}`], { encoding: "utf8" });
+            if (JSON.parse(ref).object.sha !== target.sha) throw new Error("Choose the latest successful run for this branch.");
+            appendFileSync(process.env.GITHUB_OUTPUT, `sha=${target.sha}\nbranch=${target.branch}\nattempt=${target.attempt}\n`);
+          '
 
   publish:
-    name: Publish tested version
+    name: Publish saved image without rebuilding
     needs: verify
     runs-on: ubuntu-latest
     permissions:
@@ -61,84 +61,75 @@ jobs:
       actions: read
       packages: write
     steps:
+      # Keep publication code from main; the image comes exclusively from the CI artifact.
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.verify.outputs.sha }}
-          fetch-depth: 0
       - uses: actions/download-artifact@v5
         with:
-          name: release-metadata
-          path: release-metadata
+          name: release-bundle-${{ needs.verify.outputs.attempt }}
+          path: ${{ runner.temp }}/release-bundle
           run-id: ${{ inputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Validate saved version and prevent duplicate releases
+      - name: Validate saved version, commit and archive checksum
         id: version
         env:
           EXPECTED_SHA: ${{ needs.verify.outputs.sha }}
+          EXPECTED_BRANCH: ${{ needs.verify.outputs.branch }}
+          EXPECTED_ATTEMPT: ${{ needs.verify.outputs.attempt }}
+          RUN_ID: ${{ inputs.run_id }}
         run: |
           node --input-type=module -e '
             import { readFileSync, appendFileSync } from "node:fs";
-            const saved = JSON.parse(readFileSync("release-metadata/version.json", "utf8"));
-            if (saved.sha !== process.env.EXPECTED_SHA ||
-                !/^\d+\.\d+\.\d+$/.test(saved.version)) {
-              throw new Error("Expected a stable version calculated for the tested commit");
-            }
-            appendFileSync(process.env.GITHUB_OUTPUT, `version=${saved.version}\n`);
+            import { validateMetadata, sha256 } from "./.github/scripts/release-utils.mjs";
+            const directory = `${process.env.RUNNER_TEMP}/release-bundle`;
+            const saved = JSON.parse(readFileSync(`${directory}/version.json`, "utf8"));
+            const version = validateMetadata(saved, {
+              repository: process.env.GITHUB_REPOSITORY,
+              sha: process.env.EXPECTED_SHA,
+              branch: process.env.EXPECTED_BRANCH,
+              runId: process.env.RUN_ID,
+              attempt: Number(process.env.EXPECTED_ATTEMPT)
+            });
+            if (await sha256(`${directory}/image.tar`) !== saved.archiveSha256) throw new Error("Image archive checksum mismatch.");
+            appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
           '
-          version=$(jq -r '.version' release-metadata/version.json)
-          if git show-ref --verify --quiet "refs/tags/v$version"; then
-            echo "::error::Version v$version has already been released. Test a new commit instead."
-            exit 1
-          fi
-      - name: Lowercase registry image name
-        id: image
-        env:
-          REPOSITORY: ${{ github.repository }}
-        run: echo "name=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
-        id: meta
-        with:
-          images: ${{ steps.image.outputs.name }}
-          tags: |
-            type=raw,value=${{ steps.version.outputs.version }}
-            type=raw,value=latest
-            type=sha
-          labels: |
-            org.opencontainers.image.version=${{ steps.version.outputs.version }}
-      - name: Ensure main has not moved since verification
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EXPECTED_SHA: ${{ needs.verify.outputs.sha }}
+      - name: Install OCI image copy tool
         run: |
-          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
-          if [ "$latest" != "$EXPECTED_SHA" ]; then
-            echo "::error::Main changed. Release its latest successful Container run instead."
-            exit 1
-          fi
-      - name: Publish approved image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: mode=max
-      - name: Record release and create its Git tag
+          sudo apt-get update
+          sudo apt-get install --yes skopeo
+      - name: Publish the saved multi-platform image and record its release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
           TESTED_SHA: ${{ needs.verify.outputs.sha }}
+          BRANCH: ${{ needs.verify.outputs.branch }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          gh release create "v$VERSION" --target "$TESTED_SHA" \
-            --title "v$VERSION" --generate-notes --latest
-          echo "Published v$VERSION from $TESTED_SHA" >> "$GITHUB_STEP_SUMMARY"
+          # Check the branch again immediately before publication.
+          encoded_branch=$(jq -rn --arg branch "$BRANCH" '$branch | @uri')
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$encoded_branch" --jq '.object.sha')
+          if [ "$latest" != "$TESTED_SHA" ]; then
+            echo "::error::Branch changed. Choose its latest successful Container run."
+            exit 1
+          fi
+          # Tags are checked remotely because this checkout is publication code, not the image source.
+          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v$VERSION" > "$RUNNER_TEMP/tags.json"
+          if jq -e --arg ref "refs/tags/v$VERSION" 'any(.[]; .ref == $ref)' "$RUNNER_TEMP/tags.json" > /dev/null; then
+            echo "::error::This version has already been published. Build a new version before publishing."
+            exit 1
+          fi
+          image="ghcr.io/${REPOSITORY,,}"
+          authfile="$RUNNER_TEMP/registry-auth.json"
+          trap 'rm -f "$authfile"' EXIT
+          printf '%s' "$GH_TOKEN" | skopeo login --authfile "$authfile" --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+          source="oci-archive:$RUNNER_TEMP/release-bundle/image.tar"
+          # --all includes both architectures and attestations; digests must remain identical.
+          skopeo copy --all --preserve-digests --authfile "$authfile" "$source" "docker://$image:$VERSION"
+          skopeo copy --all --preserve-digests --authfile "$authfile" "$source" "docker://$image:sha-$TESTED_SHA"
+          if [ "$BRANCH" = main ]; then
+            skopeo copy --all --preserve-digests --authfile "$authfile" "$source" "docker://$image:latest"
+            gh release create "v$VERSION" --target "$TESTED_SHA" --title "v$VERSION" --generate-notes --latest
+          else
+            # Feature/hotfix publications never update the stable latest image/release.
+            gh release create "v$VERSION" --target "$TESTED_SHA" --title "v$VERSION" --generate-notes --prerelease --latest=false
+          fi
+          echo "Published $image:$VERSION from $TESTED_SHA without rebuilding." >> "$GITHUB_STEP_SUMMARY"
