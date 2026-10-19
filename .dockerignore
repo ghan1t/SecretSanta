@@ -1,0 +1,19 @@
+# Allowlist: private files and local environment never enter the build context.
+**
+!package.json
+!package-lock.json
+!vite.config.ts
+!tsconfig.json
+!src/
+!src/**
+src/lib/paraglide/
+src/lib/server/family.private.ts
+!static/
+!static/**
+!messages/
+!messages/**
+!project.inlang/
+!project.inlang/settings.json
+!project.inlang/paraglide.config.js
+!config/
+!config/family.example.json

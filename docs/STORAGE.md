@@ -11,6 +11,8 @@ Both paths are configurable at runtime and relative to the server working direct
 
 ## Container mount
 
+See the runnable [Compose example](../compose.yaml) and [deployment instructions](../README.md#docker-deployment), including host UID/GID permissions.
+
 Family configuration and saved draws live together in `config/`. Mount that directory once, writable by the server user so startup can create a missing draw. For a container whose app directory is `/app`, the Compose settings are:
 
 ```yaml

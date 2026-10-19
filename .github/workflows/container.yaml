@@ -1,0 +1,109 @@
+name: Container
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  version:
+    name: Calculate version
+    runs-on: ubuntu-latest
+    outputs:
+      semver: ${{ steps.gitversion.outputs.semVer }}
+      version: ${{ steps.gitversion.outputs.majorMinorPatch }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: gittools/actions/gitversion/setup@v4.7.0
+        with:
+          versionSpec: '6.8.2'
+      - uses: gittools/actions/gitversion/execute@v4.7.0
+        id: gitversion
+        with:
+          configFilePath: GitVersion.yml
+      - name: Show calculated version
+        env:
+          VERSION: ${{ steps.gitversion.outputs.fullSemVer }}
+        run: echo "Calculated version $VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+  validate:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+
+  container:
+    needs: [version, validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Lowercase registry image name
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: echo "name=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=candidate-${{ needs.version.outputs.semver }}
+            type=ref,event=pr
+            type=sha
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+
+      - name: Save tested release version
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          SEMVER: ${{ needs.version.outputs.semver }}
+        run: |
+          mkdir -p release-metadata
+          node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            writeFileSync("release-metadata/version.json", JSON.stringify({
+              version: process.env.VERSION,
+              semver: process.env.SEMVER,
+              sha: process.env.GITHUB_SHA
+            }));
+          '
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          name: release-metadata
+          path: release-metadata/version.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Explain manual publication
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          echo "Checks and container build passed. Nothing has been published." >> "$GITHUB_STEP_SUMMARY"
+          echo "To release, run the Publish release workflow on main with run ID $GITHUB_RUN_ID." >> "$GITHUB_STEP_SUMMARY"
